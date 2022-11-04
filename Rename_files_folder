@@ -1,0 +1,143 @@
+Option Explicit 
+
+  
+
+Public Enum FileDialogType 
+
+    msoFileDialogOpen = 1 
+
+    msoFileDialogSaveAs = 2 
+
+    msoFileDialogFilePicker = 3 
+
+    msoFileDialogFolderPicker = 4 
+
+End Enum 
+
+  
+
+Public Sub RenameFiles() 
+
+    Dim FolderPath As String: FolderPath = FileDialogStr(msoFileDialogFolderPicker, "Select folder containing files to rename") 
+
+    If Len(FolderPath) = 0 Then Exit Sub 
+
+    Dim RowCounter As Long 
+
+    Call LudicrousMode(True) 
+
+    For RowCounter = 2 To GetLastRow(ActiveSheet, 1) 
+
+        If FileRename(FolderPath, Cells(RowCounter, 2).Value, Cells(RowCounter, 1).Value) Then 
+
+            ActiveSheet.Range(Cells(RowCounter, 1), Cells(RowCounter, 2)).Interior.Color = RGB(0, 255, 0) 
+
+        Else 
+
+            ActiveSheet.Range(Cells(RowCounter, 1), Cells(RowCounter, 2)).Interior.Color = RGB(255, 0, 0) 
+
+        End If 
+
+    Next RowCounter 
+
+    Call LudicrousMode(False) 
+
+End Sub 
+
+  
+
+Public Function FileDialogStr(ByVal DialogType As FileDialogType, Optional ByVal DialogTitle As String) As String 
+
+    Dim FileDialogObject As FileDialog 
+
+    Dim SelectedFile As Variant 
+
+  
+
+    Set FileDialogObject = Application.FileDialog(DialogType) 
+
+    With FileDialogObject 
+
+        If Len(DialogTitle) > 0 Then .Title = DialogTitle 
+
+        .AllowMultiSelect = False 
+
+        .Show 
+
+        For Each SelectedFile In .SelectedItems 
+
+            FileDialogStr = CStr(SelectedFile) 
+
+        Next SelectedFile 
+
+    End With 
+
+End Function 
+
+  
+
+Public Function GetLastRow(ByVal TargetWorksheet As Worksheet, ByVal ColumnNo As Long) As Long 
+
+    GetLastRow = TargetWorksheet.Cells(TargetWorksheet.Rows.Count, Chr(64 + ColumnNo)).End(xlUp).Row 
+
+End Function 
+
+  
+
+Public Function FileExists(ByVal FilePath As String) As Boolean 
+
+    Dim FSO As Object: Set FSO = CreateObject("Scripting.FileSystemObject") 
+
+    FileExists = FSO.FileExists(FilePath) 
+
+    Set FSO = Nothing 
+
+End Function 
+
+  
+
+Public Function BuildPath(ByVal Directory As String, ByVal AdditionalPath As String) As String 
+
+   Dim FSO As Object: Set FSO = CreateObject("Scripting.FileSystemObject") 
+
+   BuildPath = FSO.BuildPath(Directory, AdditionalPath) 
+
+   Set FSO = Nothing 
+
+End Function 
+
+  
+
+Public Function FileRename(ByVal Path As String, ByVal OldFileName As String, ByVal NewFileName As String) As Boolean 
+
+    If Not FileExists(BuildPath(Path, OldFileName)) Then Exit Function 
+
+    Dim FSO As Object: Set FSO = CreateObject("Scripting.FileSystemObject") 
+
+    Dim File As Object: Set File = FSO.GetFile(BuildPath(Path, OldFileName)) 
+
+    File.Name = NewFileName 
+
+    FileRename = FileExists(BuildPath(Path, NewFileName)) 
+
+    Set FSO = Nothing 
+
+    Set File = Nothing 
+
+End Function 
+
+  
+
+Public Sub LudicrousMode(ByVal Toggle As Boolean) 
+
+    Application.ScreenUpdating = Not Toggle 
+
+    Application.EnableEvents = Not Toggle 
+
+    Application.DisplayAlerts = Not Toggle 
+
+    Application.Calculation = IIf(Toggle, xlCalculationManual, xlCalculationAutomatic) 
+
+End Sub 
+
+ 
