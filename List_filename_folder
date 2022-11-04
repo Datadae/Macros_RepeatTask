@@ -1,0 +1,38 @@
+''This is a VBA Macro code''
+Sub get_all_files()
+
+Dim oFSO As Object, oFolder As Object, oFile As Object 
+
+Dim i As Integer 
+
+Dim sFilePath As String 
+
+ 
+
+'Define the file Path from where the list of file name need to be extracted 
+
+sFilePath = "G:\Team\Shubham\01.Folder" 
+
+ 
+
+Set oFSO = CreateObject("Scripting.FileSystemObject") 
+
+Set oFolder = oFSO.getfolder(sFilePath) 
+
+i = 2 
+
+For Each oFile In oFolder.Files 
+
+   Sheet1.Cells(i, 1).Value = oFile.Name 
+
+   i = i + 1 
+
+ 
+
+Next oFile 
+
+MsgBox "Task Completed" 
+
+End Sub 
+
+ 
