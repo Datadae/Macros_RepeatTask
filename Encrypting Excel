@@ -1,1 +1,161 @@
+Module 1
+---------------------
+' clsPasswordManager
+Option Explicit
 
+Private pSheet As Worksheet
+
+Public Sub Init(ws As Worksheet)
+    Set pSheet = ws
+End Sub
+
+Public Function GetPassword(empName As String) As String
+    Dim idx As Long, lastRow As Long
+    lastRow = pSheet.Cells(pSheet.Rows.Count, 1).End(xlUp).Row
+    GetPassword = "No password found"
+
+    For idx = 2 To lastRow
+        If Trim(pSheet.Cells(idx, 1).Value) = Trim(empName) Then
+            If Trim(pSheet.Cells(idx, 3).Value) <> "" Then
+                GetPassword = pSheet.Cells(idx, 3).Value
+            End If
+            Exit For
+        End If
+    Next idx
+End Function
+---------------
+
+Module 2
+--------------
+' clsFileProcessor
+Option Explicit
+
+Private pSourcePath As String
+Private pDestPath As String
+Private pPasswordManager As clsPasswordManager
+Private pSheet As Worksheet
+
+Public Sub Init(sourcePath As String, destPath As String, ws As Worksheet, pwdMgr As clsPasswordManager)
+    pSourcePath = sourcePath
+    pDestPath = destPath
+    Set pSheet = ws
+    Set pPasswordManager = pwdMgr
+End Sub
+
+Public Sub ProcessFiles()
+    Dim fileName As String, fullPath As String, newPath As String
+    Dim oBook As Workbook, namePart As String, pwd As String
+    Dim Fidx As Long, FNidx As Long
+
+    FNidx = 3
+    fileName = Dir(pSourcePath & "*.xlsx")
+    Do While fileName <> ""
+        FNidx = FNidx + 1
+        pSheet.Cells(FNidx, 2).Value = pSourcePath & fileName
+        fileName = Dir()
+    Loop
+
+    For Fidx = 4 To FNidx
+        fullPath = pSheet.Cells(Fidx, 2).Value
+        If Dir(fullPath) = "" Then
+            pSheet.Cells(Fidx, 3).Value = "File not found"
+            GoTo NextFile
+        End If
+
+        On Error Resume Next
+        Set oBook = Workbooks.Open(fullPath)
+        If oBook Is Nothing Then
+            pSheet.Cells(Fidx, 3).Value = "Error opening file"
+            On Error GoTo 0
+            GoTo NextFile
+        End If
+        On Error GoTo 0
+
+        namePart = ExtractName(oBook.Name)
+        pwd = pPasswordManager.GetPassword(namePart)
+        pSheet.Cells(Fidx, 3).Value = pwd
+
+        If pwd <> "No password found" Then
+            newPath = pDestPath & oBook.Name
+            On Error Resume Next
+            oBook.SaveAs Filename:=newPath, Password:=pwd
+            Err.Clear
+            On Error GoTo 0
+        End If
+
+        oBook.Close SaveChanges:=False
+        Set oBook = Nothing
+
+NextFile:
+        DoEvents
+    Next Fidx
+
+    MsgBox "Process completed after " & (FNidx - 3) & " files.", vbInformation
+End Sub
+
+Private Function ExtractName(fileName As String) As String
+    If InStr(fileName, "Controller-") > 0 Then
+        ExtractName = Mid(fileName, InStr(fileName, "Controller-") + 11)
+    ElseIf InStr(fileName, "Analyst-") > 0 Then
+        ExtractName = Mid(fileName, InStr(fileName, "Analyst-") + 8)
+    Else
+        ExtractName = Replace(fileName, ".xlsx", "")
+    End If
+    ExtractName = Replace(ExtractName, ".xlsx", "")
+End Function
+--------------
+
+Module 3 (Main Code)
+
+---------------
+
+Sub CreatePasswordProtectFilesOOP()
+    Dim wsFiles As Worksheet, wsPass As Worksheet
+    Dim sourcePath As String, destPath As String
+    Dim fileProcessor As clsFileProcessor
+    Dim pwdManager As clsPasswordManager
+
+    On Error Resume Next
+    Set wsFiles = ThisWorkbook.Sheets("FilesProcessed")
+    Set wsPass = ThisWorkbook.Sheets("Passwords")
+    On Error GoTo 0
+
+    If wsFiles Is Nothing Or wsPass Is Nothing Then
+        MsgBox "Required sheets 'FilesProcessed' or 'Passwords' not found.", vbCritical
+        Exit Sub
+    End If
+
+    sourcePath = Trim(wsFiles.Range("B1").Value)
+    If sourcePath = "" Then
+        MsgBox "Source folder path in B1 is empty.", vbExclamation
+        Exit Sub
+    End If
+    If Right(sourcePath, 1) <> "\" Then sourcePath = sourcePath & "\"
+
+    destPath = Trim(wsFiles.Range("B2").Value)
+    If destPath = "" Then
+        MsgBox "Destination folder path in B2 is empty.", vbExclamation
+        Exit Sub
+    End If
+    If Right(destPath, 1) <> "\" Then destPath = destPath & "\"
+    If Dir(destPath, vbDirectory) = "" Then MkDir destPath
+
+    wsFiles.Range("B4:C1000").ClearContents
+    wsFiles.Range("C3").Value = "Password"
+
+    Set pwdManager = New clsPasswordManager
+    pwdManager.Init wsPass
+
+    Set fileProcessor = New clsFileProcessor
+    fileProcessor.Init sourcePath, destPath, wsFiles, pwdManager
+
+    Application.ScreenUpdating = False
+    Application.DisplayAlerts = False
+    Application.EnableEvents = False
+
+    fileProcessor.ProcessFiles
+
+    Application.ScreenUpdating = True
+    Application.DisplayAlerts = True
+    Application.EnableEvents = True
+End Sub
